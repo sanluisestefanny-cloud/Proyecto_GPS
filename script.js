@@ -2,7 +2,7 @@ const API_URL = 'https://proyecto-gps-ynmg.onrender.com/api';
 let map;
 let rutaActual; 
 let marcadoresFlota = {}; 
-let watchId = null; // Para el rastreo GPS en tiempo real
+let watchId = null; 
 
 // 1. CONFIGURACIÓN DE ICONO Y RUTAS
 const combiIcon = L.icon({
@@ -35,7 +35,7 @@ function toggleAuth() {
     register.style.display = isLoginVisible ? 'block' : 'none';
 }
 
-// 4. LOGIN ACTUALIZADO
+// 4. LOGIN (Ahora recupera la unidad vinculada)
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('email').value;
@@ -52,6 +52,9 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
             localStorage.setItem('token', data.token);
             localStorage.setItem('userRol', data.user.rol);
             localStorage.setItem('userName', data.user.nombre); 
+            // Guardamos la unidad vinculada al chofer
+            if(data.user.unidad) localStorage.setItem('userUnidad', data.user.unidad);
+            
             configurarInterfazSegunRol(data.user.rol);
         } else {
             alert(data.msg || "Error en el login");
@@ -61,19 +64,20 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     }
 });
 
-// 5. REGISTRO
+// 5. REGISTRO (Envía la unidad si es chofer)
 document.getElementById('register-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const nombre = document.getElementById('reg-nombre').value;
     const email = document.getElementById('reg-email').value;
     const password = document.getElementById('reg-password').value;
     const rol = document.getElementById('reg-rol').value;
+    const unidad = document.getElementById('reg-unidad').value; // Nueva unidad
 
     try {
         const res = await fetch(`${API_URL}/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nombre, email, password, rol })
+            body: JSON.stringify({ nombre, email, password, rol, unidad })
         });
         if (res.ok) {
             alert("✅ Registro exitoso. Inicia sesión.");
@@ -87,12 +91,17 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
     }
 });
 
-// 6. INTERFAZ (Modificada para mostrar el botón de cerrar sesión flotante)
+function verificarRol(){
+    const rol = document.getElementById('reg-rol').value;
+    const container = document.getElementById('unidad-input-container');
+    container.style.display =( rol === 'chofer') ? 'block' : 'none';
+}
+
+// 6. INTERFAZ
 async function configurarInterfazSegunRol(rol) {
     document.getElementById('auth-section').style.display = 'none';
     document.getElementById('map-section').style.display = 'block';
     
-    // Mostramos el wrapper del botón de cerrar sesión flotante
     const logoutWrapper = document.getElementById('logout-wrapper');
     if (logoutWrapper) logoutWrapper.style.display = 'block';
 
@@ -106,62 +115,59 @@ async function configurarInterfazSegunRol(rol) {
     }
 }
 
-// 7. CARGAR UNIDADES
+// 7. CARGAR TODA LA FLOTA
 async function cargarUnidadesEnMapa() {
     try {
         const res = await fetch(`${API_URL}/combis/activas`);
         if (res.ok) {
             const unidades = await res.json();
             
-            // 1. Limpiamos marcadores que ya no están activos en la base de datos
+            // Limpiar unidades inactivas
             Object.keys(marcadoresFlota).forEach(id => {
-                const todaviaExiste = unidades.find(u => u._id === id);
-                if (!todaviaExiste) {
+                const existe = unidades.find(u => u._id === id);
+                if (!existe) {
                     map.removeLayer(marcadoresFlota[id]);
                     delete marcadoresFlota[id];
                 }
             });
 
-            // 2. Dibujamos o actualizamos cada unidad de la lista
             unidades.forEach(u => {
                 const popupContent = `
                     <div style="text-align: center;">
                         <b style="color: #00796b;">Unidad: ${u.numEconomico}</b><br>
-                        <b>Chofer:</b> ${u.nombreChofer || 'En servicio'}<br>
+                        <b>Chofer:</b> ${u.nombreChofer}<br>
                         <b>Ruta:</b> ${u.ruta}
-                    </div>
-                `;
+                    </div>`;
 
                 if (!marcadoresFlota[u._id]) {
-                    // Si es una unidad nueva, creamos su marcador
                     marcadoresFlota[u._id] = L.marker([u.lat, u.lng], { icon: combiIcon })
-                        .addTo(map)
-                        .bindPopup(popupContent);
+                        .addTo(map).bindPopup(popupContent);
                 } else {
-                    // Si ya existe, solo movemos su posición en el mapa
                     marcadoresFlota[u._id].setLatLng([u.lat, u.lng]).setPopupContent(popupContent);
                 }
             });
         }
-    } catch (e) { 
-        console.log("Sincronizando flota..."); 
+    } catch (e) { console.log("Sincronizando..."); }
+}
+
+function initMap() {
+    if (!map) {
+        map = L.map('map').setView([19.313, -98.238], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     }
 }
 
-// 8. RASTREO GPS EN TIEMPO REAL
+// 8. RASTREO AUTOMATIZADO (Toma la unidad del perfil)
 function toggleStatus() {
     const btn = document.getElementById('btn-status');
-    const statusText = document.getElementById('status-text');
     const estaActivo = btn.innerText === "Iniciar Ruta";
     
     if (estaActivo) {
         btn.innerText = "Finalizar Ruta";
-        statusText.innerText = "Activo - En Ruta";
         btn.style.background = "#d32f2f";
         iniciarSeguimientoGPS();
     } else {
         btn.innerText = "Iniciar Ruta";
-        statusText.innerText = "Fuera de Servicio";
         btn.style.background = "#00796b";
         detenerSeguimientoGPS();
     }
@@ -174,8 +180,8 @@ function iniciarSeguimientoGPS() {
                 lat: pos.coords.latitude,
                 lng: pos.coords.longitude,
                 nombreChofer: localStorage.getItem('userName'),
-                numEconomico: document.getElementById('numEconomico').value || "S/N",
-                ruta: document.getElementById('rutaCombi').value || "General"
+                numEconomico: localStorage.getItem('userUnidad') || "S/N", // Automático
+                ruta: "Ruta Activa" 
             };
 
             await fetch(`${API_URL}/combis/update-gps`, {

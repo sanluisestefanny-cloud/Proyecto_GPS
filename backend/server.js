@@ -5,7 +5,7 @@ require('dotenv').config();
 
 // --- 1. IMPORTACIÓN DEL MODELO (Paso 2 de limpieza) ---
 // Importamos el modelo desde su archivo independiente para evitar duplicados
-const Combi = require('./backend/models/Combi'); 
+const Combi = require('./models/Combi');
 
 const app = express();
 

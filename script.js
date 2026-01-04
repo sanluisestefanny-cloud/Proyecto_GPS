@@ -2,7 +2,12 @@ const API_URL = 'https://proyecto-gps-ynmg.onrender.com/api';
 let map;
 let rutaActual; 
 let marcadoresFlota = {}; 
-let watchId = null; 
+let watchId = null;
+
+const unidadesSimuladas = [
+    { _id: 'sim-1', numEconomico: '05', nombreChofer: 'Simulador 1', ruta: 'Tlaxcala-Apizaco', lat: 19.3133, lng: -98.2394 },
+    { _id: 'sim-2', numEconomico: '12', nombreChofer: 'Simulador 2', ruta: 'Apizaco-Teacalco', lat: 19.4125, lng: -98.1408 }
+];
 
 // 1. CONFIGURACIÓN DE ICONO Y RUTAS
 const combiIcon = L.icon({
@@ -119,35 +124,37 @@ async function configurarInterfazSegunRol(rol) {
 async function cargarUnidadesEnMapa() {
     try {
         const res = await fetch(`${API_URL}/combis/activas`);
+        let unidadesReales = [];
         if (res.ok) {
-            const unidades = await res.json();
-            
-            // Limpiar unidades inactivas
-            Object.keys(marcadoresFlota).forEach(id => {
-                const existe = unidades.find(u => u._id === id);
-                if (!existe) {
-                    map.removeLayer(marcadoresFlota[id]);
-                    delete marcadoresFlota[id];
-                }
-            });
-
-            unidades.forEach(u => {
-                const popupContent = `
-                    <div style="text-align: center;">
-                        <b style="color: #00796b;">Unidad: ${u.numEconomico}</b><br>
-                        <b>Chofer:</b> ${u.nombreChofer}<br>
-                        <b>Ruta:</b> ${u.ruta}
-                    </div>`;
-
-                if (!marcadoresFlota[u._id]) {
-                    marcadoresFlota[u._id] = L.marker([u.lat, u.lng], { icon: combiIcon })
-                        .addTo(map).bindPopup(popupContent);
-                } else {
-                    marcadoresFlota[u._id].setLatLng([u.lat, u.lng]).setPopupContent(popupContent);
-                }
-            });
+            unidadesReales = await res.json();
         }
-    } catch (e) { console.log("Sincronizando..."); }
+
+        // Unimos las reales con las simuladas
+        const todasLasUnidades = [...unidadesSimuladas, ...unidadesReales];
+
+        todasLasUnidades.forEach(u => {
+            const popupContent = `
+                <div style="text-align: center;">
+                    <b style="color: #00796b;">Unidad: ${u.numEconomico}</b><br>
+                    <b>Chofer:</b> ${u.nombreChofer}<br>
+                    <b>Ruta:</b> ${u.ruta}
+                </div>`;
+
+            if (!marcadoresFlota[u._id]) {
+                // Si la unidad es nueva (recién registrada), aparece de inmediato
+                marcadoresFlota[u._id] = L.marker([u.lat, u.lng], { icon: combiIcon })
+                    .addTo(map).bindPopup(popupContent);
+                
+                // Si es una unidad real recién aparecida, abrimos su popup para avisar
+                if(!u._id.startsWith('sim-')) marcadoresFlota[u._id].openPopup();
+            } else {
+                // Actualizamos posición si hay movimiento
+                marcadoresFlota[u._id].setLatLng([u.lat, u.lng]).setPopupContent(popupContent);
+            }
+        });
+    } catch (e) {
+        console.log("Error al cargar unidades:", e);
+    }
 }
 
 function initMap() {
@@ -165,14 +172,31 @@ function toggleStatus() {
     if (estaActivo) {
         btn.innerText = "Finalizar Ruta";
         btn.style.background = "#d32f2f";
-        iniciarSeguimientoGPS();
+        
+        // 1. Enviamos la primera ubicación DE INMEDIATO (aunque no se mueva)
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const inicial = {
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+                nombreChofer: localStorage.getItem('userName'),
+                numEconomico: localStorage.getItem('userUnidad') || "S/N",
+                ruta: "Iniciando Servicio"
+            };
+            await fetch(`${API_URL}/combis/update-gps`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(inicial)
+            });
+            
+            // 2. Después de enviar la primera vez, activamos el rastreo continuo
+            iniciarSeguimientoGPS();
+        });
     } else {
         btn.innerText = "Iniciar Ruta";
         btn.style.background = "#00796b";
         detenerSeguimientoGPS();
     }
 }
-
 function iniciarSeguimientoGPS() {
     if ("geolocation" in navigator) {
         watchId = navigator.geolocation.watchPosition(async (pos) => {

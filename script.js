@@ -197,6 +197,7 @@ function toggleStatus() {
         detenerSeguimientoGPS();
     }
 }
+
 function iniciarSeguimientoGPS() {
     if ("geolocation" in navigator) {
         watchId = navigator.geolocation.watchPosition(async (pos) => {

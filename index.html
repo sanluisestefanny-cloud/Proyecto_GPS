@@ -31,24 +31,27 @@
                     <p>¿Eres nuevo? <a href="#" onclick="toggleAuth()">Regístrate</a></p>
                 </div>
 
-                <div id="register-container" style="display: none;">
-                    <h2>Registro de Personal</h2>
-                    <form id="register-form">
-                        <input type="text" id="reg-nombre" placeholder="Nombre completo" required>
-                        <input type="email" id="reg-email" placeholder="Email" required>
-                        <input type="password" id="reg-password" placeholder="Contraseña" required>
-                        <select id="reg-rol">
-                            <option value="usuario">Pasajero (Usuario)</option>
-                            <option value="chofer">Chofer (Operador)</option>
-                            <option value="concesionario">Dueño (Concesionario)</option>
-                        </select>
-                        <div id="unidad-input-container" style="display: none;">
-                             <input type="text" id="reg-unidad" placeholder="Número de Unidad (Ej: 22)">
-                            </div>
-                        <button type="submit">Crear Cuenta</button>
-                    </form>
-                    <p><a href="#" onclick="toggleAuth()">Volver al Login</a></p>
-                </div>
+               <div id="register-container" style="display: none;">
+    <h2>Registro de Personal</h2>
+    <form id="register-form">
+        <input type="text" id="reg-nombre" placeholder="Nombre completo" required>
+        <input type="email" id="reg-email" placeholder="Email" required>
+        <input type="password" id="reg-password" placeholder="Contraseña" required>
+        
+        <select id="reg-rol" onchange="verificarRol()">
+            <option value="usuario">Pasajero (Usuario)</option>
+            <option value="chofer">Chofer (Operador)</option>
+            <option value="concesionario">Dueño (Concesionario)</option>
+        </select>
+
+        <div id="unidad-input-container" style="display: none; margin-top: 10px;">
+            <input type="text" id="reg-unidad" placeholder="Número de Unidad Asignada (Ej: 22)">
+        </div>
+
+        <button type="submit">Crear Cuenta</button>
+    </form>
+    <p><a href="#" onclick="toggleAuth()">Volver al Login</a></p>
+</div>
             </div>
         </section>
 

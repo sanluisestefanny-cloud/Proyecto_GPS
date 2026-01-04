@@ -9,83 +9,78 @@ const app = express();
 app.use(cors()); 
 app.use(express.json()); 
 
-// --- 2. MODELO DE COMBI ACTUALIZADO ---
-// Agregamos 'numEconomico' como clave única para que cada unidad sea independiente
+// --- 2. MODELO DE COMBI ---
+// Aseguramos que el esquema coincida exactamente con los datos que envía el script.js
 const CombiSchema = new mongoose.Schema({
-    numEconomico: { type: String, required: true, unique: true }, // Identificador único de la combi
-    ruta: String,
-    nombreChofer: String,
-    lat: Number,
-    lng: Number,
+    numEconomico: { type: String, required: true, unique: true },
+    ruta: { type: String, default: "Ruta Activa" },
+    nombreChofer: { type: String, default: "Cargando..." },
+    lat: { type: Number, required: true },
+    lng: { type: Number, required: true },
     activo: { type: Boolean, default: true },
     ultimaActualizacion: { type: Date, default: Date.now }
 });
 const Combi = mongoose.model('Combi', CombiSchema);
 
-// --- 3. RUTAS ---
+// --- 3. RUTAS DE AUTENTICACIÓN ---
 app.use('/api/auth', require('./routes/auth')); 
 
-// --- 3.1 RUTAS DE RASTREO GPS OPTIMIZADAS ---
+// --- 4. RUTAS DE RASTREO GPS ---
 
-// RUTA PARA RECIBIR COORDENADAS (Maneja múltiples unidades automáticamente)
+// ACTUALIZAR POSICIÓN: Esta es la ruta que recibe los datos de tu celular
 app.post('/api/combis/update-gps', async (req, res) => {
     try {
         const { numEconomico, lat, lng, nombreChofer, ruta } = req.body;
 
-        if (!numEconomico) {
-            return res.status(400).json({ msg: "Falta el número económico de la unidad" });
+        if (!numEconomico || lat === undefined || lng === undefined) {
+            return res.status(400).json({ msg: "Datos incompletos (Falta unidad o coordenadas)" });
         }
 
-        // Buscamos por numEconomico. Si no existe, lo crea (upsert). Si existe, lo actualiza.
+        // Buscamos la unidad. Si no existe la crea (upsert).
         const unidadActualizada = await Combi.findOneAndUpdate(
             { numEconomico: numEconomico }, 
             { 
                 lat, 
                 lng, 
-                nombreChofer: nombreChofer || "Chofer en turno", 
-                ruta: ruta || "Ruta no definida", 
+                nombreChofer: nombreChofer || "Chofer", 
+                ruta: ruta || "En trayecto", 
                 activo: true, 
                 ultimaActualizacion: new Date() 
             },
-            { new: true, upsert: true } // Upsert permite que aparezcan unidades nuevas automáticamente
+            { new: true, upsert: true } 
         );
 
-        res.status(200).json({ msg: "Ubicación sincronizada", unidad: unidadActualizada });
+        console.log(`✅ Unidad ${numEconomico} actualizada en Atlas`);
+        res.status(200).json(unidadActualizada);
     } catch (error) {
-        console.error("Error en GPS:", error);
-        res.status(500).json({ msg: "Error al procesar GPS" });
+        console.error("❌ Error en update-gps:", error);
+        res.status(500).json({ msg: "Error al procesar ubicación" });
     }
 });
 
-// RUTA PARA QUE EL DUEÑO VEA TODA LA FLOTA ACTIVA
+// OBTENER UNIDADES: El mapa usa esta ruta para dibujar las combis
 app.get('/api/combis/activas', async (req, res) => {
     try {
-        // Mostramos solo las que han enviado señal en los últimos 5 minutos para que el mapa esté limpio
-        const cincoMinutosAgo = new Date(Date.now() - 5 * 60 * 1000);
+        // Aumentamos a 30 minutos el margen para que la unidad no desaparezca si el GPS falla un momento
+        const margenTiempo = new Date(Date.now() - 30 * 60 * 1000); 
         const unidades = await Combi.find({ 
-            ultimaActualizacion: { $gte: cincoMinutosAgo },
+            ultimaActualizacion: { $gte: margenTiempo },
             activo: true 
         });
         res.json(unidades);
     } catch (error) {
-        res.status(500).json({ msg: "Error al obtener la flota" });
+        res.status(500).json({ msg: "Error al obtener unidades" });
     }
 });
 
 app.use('/api/combis', require('./routes/combis')); 
 
-// --- 4. CONEXIÓN A MONGODB ATLAS ---
+// --- 5. CONEXIÓN A MONGODB ATLAS ---
 mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('✅ Conexión exitosa a MongoDB Atlas'))
-    .catch(err => console.error('❌ Error al conectar a la base de datos:', err));
+    .then(() => console.log('🚀 Conectado a MongoDB Atlas: GPS_Proyecto'))
+    .catch(err => console.error('❌ Error de conexión:', err));
 
-// --- 5. RUTA DE PRUEBA INICIAL ---
-app.get('/', (req, res) => {
-    res.send('Servidor del Sistema GPS (Flota Multicombi) funcionando 🚀');
-});
-
-// --- 6. INICIO DEL SERVIDOR ---
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-    console.log(`🚀 Servidor corriendo en el puerto ${PORT}`);
+    console.log(`📡 Servidor listo en puerto ${PORT}`);
 });

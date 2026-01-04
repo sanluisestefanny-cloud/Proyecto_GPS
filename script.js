@@ -112,30 +112,40 @@ async function cargarUnidadesEnMapa() {
         const res = await fetch(`${API_URL}/combis/activas`);
         if (res.ok) {
             const unidades = await res.json();
+            
+            // 1. Limpiamos marcadores que ya no están activos en la base de datos
+            Object.keys(marcadoresFlota).forEach(id => {
+                const todaviaExiste = unidades.find(u => u._id === id);
+                if (!todaviaExiste) {
+                    map.removeLayer(marcadoresFlota[id]);
+                    delete marcadoresFlota[id];
+                }
+            });
+
+            // 2. Dibujamos o actualizamos cada unidad de la lista
             unidades.forEach(u => {
                 const popupContent = `
-                    <b>Unidad: ${u.numEconomico}</b><br>
-                    <b>Chofer: ${u.nombreChofer || 'Anonimo'}</b><br>
-                    Ruta: ${u.ruta}
+                    <div style="text-align: center;">
+                        <b style="color: #00796b;">Unidad: ${u.numEconomico}</b><br>
+                        <b>Chofer:</b> ${u.nombreChofer || 'En servicio'}<br>
+                        <b>Ruta:</b> ${u.ruta}
+                    </div>
                 `;
+
                 if (!marcadoresFlota[u._id]) {
+                    // Si es una unidad nueva, creamos su marcador
                     marcadoresFlota[u._id] = L.marker([u.lat, u.lng], { icon: combiIcon })
                         .addTo(map)
                         .bindPopup(popupContent);
                 } else {
+                    // Si ya existe, solo movemos su posición en el mapa
                     marcadoresFlota[u._id].setLatLng([u.lat, u.lng]).setPopupContent(popupContent);
                 }
             });
         }
-    } catch (e) { console.log("Buscando unidades..."); }
-}
-
-function initMap() {
-    if (!map) {
-        map = L.map('map').setView([19.313, -98.238], 12);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    } catch (e) { 
+        console.log("Sincronizando flota..."); 
     }
-    setTimeout(() => { map.invalidateSize(); }, 200);
 }
 
 // 8. RASTREO GPS EN TIEMPO REAL

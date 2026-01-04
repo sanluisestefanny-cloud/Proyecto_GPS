@@ -179,3 +179,26 @@ input[list]::-webkit-calendar-picker-indicator {
         bottom: 10px;
     }
 }
+/* Estilo para que el botón de cerrar sesión flote en la esquina */
+.logout-container {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 1000; /* Para que esté por encima del mapa */
+}
+
+#btn-logout {
+    padding: 8px 15px;
+    background-color: #ff4444;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-weight: bold;
+    box-shadow: 0px 2px 5px rgba(0,0,0,0.2);
+}
+
+/* Ajuste para que el mapa no oculte nada en el móvil */
+#map {
+    height: 70vh; /* Reduce el mapa al 70% de la pantalla en móvil */
+    width: 100%;
+}

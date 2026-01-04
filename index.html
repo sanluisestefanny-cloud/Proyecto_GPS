@@ -12,6 +12,12 @@
         <h1>Monitor GPS - Transporte Tlaxcala</h1>
     </header>
 
+    <div id="logout-wrapper" style="display: none;">
+        <div class="logout-container">
+            <button id="btn-logout" onclick="logout()">Cerrar Sesión</button>
+        </div>
+    </div>
+
     <main id="app">
         <section id="auth-section">
             <div class="card">
@@ -69,8 +75,6 @@
                 <p>Estado: <span id="status-text">Fuera de Servicio</span></p>
                 <button id="btn-status" onclick="toggleStatus()">Iniciar Ruta</button>
             </div>
-
-            <button onclick="logout()" class="btn-logout">Cerrar Sesión</button>
         </section>
     </main>
 

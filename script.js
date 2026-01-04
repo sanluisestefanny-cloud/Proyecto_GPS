@@ -35,7 +35,7 @@ function toggleAuth() {
     register.style.display = isLoginVisible ? 'block' : 'none';
 }
 
-// 4. LOGIN ACTUALIZADO (Guarda el nombre del usuario)
+// 4. LOGIN ACTUALIZADO
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('email').value;
@@ -51,7 +51,6 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         if (response.ok) {
             localStorage.setItem('token', data.token);
             localStorage.setItem('userRol', data.user.rol);
-            // PASO CLAVE: Guardamos el nombre para el marcador
             localStorage.setItem('userName', data.user.nombre); 
             configurarInterfazSegunRol(data.user.rol);
         } else {
@@ -88,22 +87,26 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
     }
 });
 
-// 6. INTERFAZ
+// 6. INTERFAZ (Modificada para mostrar el botón de cerrar sesión flotante)
 async function configurarInterfazSegunRol(rol) {
     document.getElementById('auth-section').style.display = 'none';
     document.getElementById('map-section').style.display = 'block';
+    
+    // Mostramos el wrapper del botón de cerrar sesión flotante
+    const logoutWrapper = document.getElementById('logout-wrapper');
+    if (logoutWrapper) logoutWrapper.style.display = 'block';
+
     initMap();
 
     document.getElementById('admin-panel').style.display = rol === 'concesionario' ? 'block' : 'none';
     document.getElementById('driver-panel').style.display = rol === 'chofer' ? 'block' : 'none';
 
     if (rol === 'concesionario' || rol === 'usuario') {
-        // Actualizamos el mapa cada 5 segundos para ver movimiento
         setInterval(cargarUnidadesEnMapa, 5000); 
     }
 }
 
-// 7. CARGAR UNIDADES (Muestra quién es el chofer)
+// 7. CARGAR UNIDADES
 async function cargarUnidadesEnMapa() {
     try {
         const res = await fetch(`${API_URL}/combis/activas`);
@@ -135,7 +138,7 @@ function initMap() {
     setTimeout(() => { map.invalidateSize(); }, 200);
 }
 
-// 8. RASTREO GPS EN TIEMPO REAL (Para el Chofer)
+// 8. RASTREO GPS EN TIEMPO REAL
 function toggleStatus() {
     const btn = document.getElementById('btn-status');
     const statusText = document.getElementById('status-text');
@@ -165,7 +168,6 @@ function iniciarSeguimientoGPS() {
                 ruta: document.getElementById('rutaCombi').value || "General"
             };
 
-            // Enviar a Render
             await fetch(`${API_URL}/combis/update-gps`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

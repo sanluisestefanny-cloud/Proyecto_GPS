@@ -3,7 +3,7 @@ let map;
 let marcadoresFlota = {}; 
 let watchId = null;
 
-// Unidades que siempre aparecerán en el mapa
+// Unidades simuladas para que el mapa nunca esté vacío
 const unidadesSimuladas = [
     { _id: 'sim-1', numEconomico: '05', nombreChofer: 'Simulador 1', ruta: 'Tlaxcala-Apizaco', lat: 19.3133, lng: -98.2394 },
     { _id: 'sim-2', numEconomico: '12', nombreChofer: 'Simulador 2', ruta: 'Apizaco-Teacalco', lat: 19.4125, lng: -98.1408 }
@@ -15,7 +15,6 @@ const combiIcon = L.icon({
     iconAnchor: [17, 17]
 });
 
-// 1. CARGA INICIAL
 window.onload = () => {
     const token = localStorage.getItem('token');
     const rol = localStorage.getItem('userRol');
@@ -32,7 +31,7 @@ function toggleAuth() {
     register.style.display = isLoginVisible ? 'block' : 'none';
 }
 
-// 2. MANEJO DE LOGIN
+// LOGIN: Guarda la unidad vinculada
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('email').value;
@@ -49,9 +48,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
             localStorage.setItem('token', data.token);
             localStorage.setItem('userRol', data.user.rol);
             localStorage.setItem('userName', data.user.nombre); 
-            // Guardamos la unidad vinculada que viene del servidor
             if(data.user.unidad) localStorage.setItem('userUnidad', data.user.unidad);
-            
             configurarInterfazSegunRol(data.user.rol);
         } else {
             alert(data.msg || "Error en el login");
@@ -61,17 +58,14 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     }
 });
 
-// 3. REGISTRO (Captura correctamente la unidad del chofer)
+// REGISTRO: Envía la unidad al servidor
 document.getElementById('register-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const nombre = document.getElementById('reg-nombre').value;
     const email = document.getElementById('reg-email').value;
     const password = document.getElementById('reg-password').value;
     const rol = document.getElementById('reg-rol').value;
-    
-    // CAPTURA DE UNIDAD: Importante para el formulario del chofer
-    const unidadInput = document.getElementById('reg-unidad');
-    const unidad = unidadInput ? unidadInput.value : null;
+    const unidad = document.getElementById('reg-unidad').value;
 
     try {
         const res = await fetch(`${API_URL}/auth/register`, {
@@ -91,22 +85,16 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
     }
 });
 
-// Función para mostrar/ocultar el campo de unidad en el registro
 function verificarRol(){
     const rol = document.getElementById('reg-rol').value;
     const container = document.getElementById('unidad-input-container');
-    if(container) {
-        container.style.display = (rol === 'chofer') ? 'block' : 'none';
-    }
+    if(container) container.style.display = (rol === 'chofer') ? 'block' : 'none';
 }
 
-// 4. CONFIGURACIÓN DE INTERFAZ
 async function configurarInterfazSegunRol(rol) {
     document.getElementById('auth-section').style.display = 'none';
     document.getElementById('map-section').style.display = 'block';
-    
-    const logoutWrapper = document.getElementById('logout-wrapper');
-    if (logoutWrapper) logoutWrapper.style.display = 'block';
+    if (document.getElementById('logout-wrapper')) document.getElementById('logout-wrapper').style.display = 'block';
 
     initMap();
 
@@ -117,7 +105,7 @@ async function configurarInterfazSegunRol(rol) {
     setInterval(cargarUnidadesEnMapa, 4000); 
 }
 
-// 5. RENDERIZADO DE FLOTA (Simuladas + Reales)
+// LÓGICA DE MAPA: Usa numEconomico como ID para evitar que se pierdan las reales
 async function cargarUnidadesEnMapa() {
     try {
         const res = await fetch(`${API_URL}/combis/activas`);
@@ -129,6 +117,7 @@ async function cargarUnidadesEnMapa() {
         const todasLasUnidades = [...unidadesSimuladas, ...unidadesReales];
 
         todasLasUnidades.forEach(u => {
+            const idMapa = u.numEconomico; // Usamos el número económico como clave única
             const popupContent = `
                 <div style="text-align: center;">
                     <b style="color: #00796b;">Unidad: ${u.numEconomico}</b><br>
@@ -136,18 +125,18 @@ async function cargarUnidadesEnMapa() {
                     <b>Ruta:</b> ${u.ruta || 'En tránsito'}
                 </div>`;
 
-            if (!marcadoresFlota[u._id]) {
-                marcadoresFlota[u._id] = L.marker([u.lat, u.lng], { icon: combiIcon })
+            if (!marcadoresFlota[idMapa]) {
+                marcadoresFlota[idMapa] = L.marker([u.lat, u.lng], { icon: combiIcon })
                     .addTo(map).bindPopup(popupContent);
                 
-                // Si la unidad es real (ID de MongoDB), abre el popup automáticamente al aparecer
-                if(!u._id.toString().startsWith('sim')) marcadoresFlota[u._id].openPopup();
+                // Si la unidad es real (ID de base de datos), abre el popup
+                if(u._id && !u._id.toString().startsWith('sim')) marcadoresFlota[idMapa].openPopup();
             } else {
-                marcadoresFlota[u._id].setLatLng([u.lat, u.lng]).setPopupContent(popupContent);
+                marcadoresFlota[idMapa].setLatLng([u.lat, u.lng]).setPopupContent(popupContent);
             }
         });
     } catch (e) {
-        console.log("Sincronizando flota...");
+        console.log("Sincronizando...");
     }
 }
 
@@ -159,16 +148,15 @@ function initMap() {
     setTimeout(() => { map.invalidateSize(); }, 400);
 }
 
-// 6. ACTIVACIÓN INMEDIATA DEL CHOFER
+// CONTROL DEL CHOFER: Envío de datos corregido
 function toggleStatus() {
     const btn = document.getElementById('btn-status');
     const estaActivo = btn.innerText === "Iniciar Ruta";
     
     if (estaActivo) {
-        // Validación de unidad para choferes
         let unidad = localStorage.getItem('userUnidad');
         if (!unidad) {
-            unidad = prompt("Unidad no detectada. Ingresa el número de tu unidad:");
+            unidad = prompt("Unidad no detectada. Ingresa tu número de unidad:");
             if (unidad) localStorage.setItem('userUnidad', unidad);
             else return; 
         }
@@ -176,7 +164,7 @@ function toggleStatus() {
         btn.innerText = "Finalizar Ruta";
         btn.style.background = "#d32f2f";
         
-        // ENVÍO DE UBICACIÓN INMEDIATO AL ACTIVAR
+        // ENVÍO INMEDIATO AL ACTIVAR
         navigator.geolocation.getCurrentPosition(async (pos) => {
             const inicial = {
                 lat: pos.coords.latitude,
@@ -193,7 +181,7 @@ function toggleStatus() {
             });
             
             iniciarSeguimientoGPS();
-        }, (err) => alert("Error: Debes permitir el acceso al GPS para iniciar ruta."), { enableHighAccuracy: true });
+        }, (err) => alert("Error: Activa el GPS para iniciar."), { enableHighAccuracy: true });
     } else {
         btn.innerText = "Iniciar Ruta";
         btn.style.background = "#00796b";

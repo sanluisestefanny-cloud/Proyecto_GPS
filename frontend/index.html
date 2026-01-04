@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPS Combi Tlaxcala</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <header>
+        <h1>Monitor GPS - Transporte Tlaxcala</h1>
+    </header>
+
+    <main id="app">
+        <section id="auth-section">
+            <div class="card">
+                <div id="login-container">
+                    <h2>Iniciar Sesión</h2>
+                    <form id="login-form">
+                        <input type="email" id="email" placeholder="Email" required>
+                        <input type="password" id="password" placeholder="Contraseña" required>
+                        <button type="submit">Entrar</button>
+                    </form>
+                    <p>¿Eres nuevo? <a href="#" onclick="toggleAuth()">Regístrate</a></p>
+                </div>
+
+                <div id="register-container" style="display: none;">
+                    <h2>Registro de Personal</h2>
+                    <form id="register-form">
+                        <input type="text" id="reg-nombre" placeholder="Nombre completo" required>
+                        <input type="email" id="reg-email" placeholder="Email" required>
+                        <input type="password" id="reg-password" placeholder="Contraseña" required>
+                        <select id="reg-rol">
+                            <option value="usuario">Pasajero (Usuario)</option>
+                            <option value="chofer">Chofer (Operador)</option>
+                            <option value="concesionario">Dueño (Concesionario)</option>
+                        </select>
+                        <button type="submit">Crear Cuenta</button>
+                    </form>
+                    <p><a href="#" onclick="toggleAuth()">Volver al Login</a></p>
+                </div>
+            </div>
+        </section>
+
+        <section id="map-section" style="display: none;">
+            <div id="map"></div>
+
+            <div id="admin-panel" class="floating-panel" style="display: none;">
+                <h3>Registrar Nueva Unidad</h3>
+                <form id="combi-form">
+                    <input type="text" id="placas" placeholder="Placas (Ej: XTA-123)" required>
+                    <input type="text" id="numEconomico" placeholder="Número Económico" required>
+                    <input type="text" id="rutaCombi" list="opcionesRutas" placeholder="Seleccione Ruta e Itinerario" required>
+                    <datalist id="opcionesRutas">
+                        <option value="Apizaco Teacalco">
+                        <option value="Teacalco Apizaco">
+                        <option value="Tlaxcala Apizaco">
+                        <option value="Apizaco Tlaxcala">
+                        <option value="Huamantla Tlaxcala">
+                        <option value="Tlaxcala Huamantla">
+                    </datalist>
+                    <button type="submit">Activar en Mapa</button>
+                </form>
+            </div>
+
+            <div id="driver-panel" class="floating-panel" style="display: none;">
+                <h3>Panel del Chofer</h3>
+                <p>Estado: <span id="status-text">Fuera de Servicio</span></p>
+                <button id="btn-status" onclick="toggleStatus()">Iniciar Ruta</button>
+            </div>
+
+            <button onclick="logout()" class="btn-logout">Cerrar Sesión</button>
+        </section>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

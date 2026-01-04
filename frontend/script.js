@@ -1,4 +1,5 @@
-const API_URL = 'http://localhost:5000/api';
+// Borra la línea de localhost y pon esta:
+const API_URL = 'https://proyecto-gps-ynmg.onrender.com/api';
 let map;
 let rutaActual; 
 let marcadoresFlota = {}; // Objeto para controlar múltiples combis en el mapa

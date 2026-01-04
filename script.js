@@ -1,10 +1,10 @@
-// Borra la línea de localhost y pon esta:
 const API_URL = 'https://proyecto-gps-ynmg.onrender.com/api';
 let map;
 let rutaActual; 
-let marcadoresFlota = {}; // Objeto para controlar múltiples combis en el mapa
+let marcadoresFlota = {}; 
+let watchId = null; // Para el rastreo GPS en tiempo real
 
-// 1. CONFIGURACIÓN DE ICONO Y RUTAS MAESTRAS
+// 1. CONFIGURACIÓN DE ICONO Y RUTAS
 const combiIcon = L.icon({
     iconUrl: 'https://cdn-icons-png.flaticon.com/512/3448/3448339.png',
     iconSize: [35, 35],
@@ -17,7 +17,7 @@ const rutasMaestras = {
     "huamantla-tlaxcala": [[19.3128, -97.9225], [19.3150, -98.1000], [19.3133, -98.2394]]
 };
 
-// 2. PERSISTENCIA Y CARGA INICIAL
+// 2. PERSISTENCIA Y CARGA
 window.onload = () => {
     const token = localStorage.getItem('token');
     const rol = localStorage.getItem('userRol');
@@ -26,7 +26,7 @@ window.onload = () => {
     }
 };
 
-// 3. FUNCIONES DE NAVEGACIÓN
+// 3. NAVEGACIÓN
 function toggleAuth() {
     const login = document.getElementById('login-container');
     const register = document.getElementById('register-container');
@@ -35,7 +35,7 @@ function toggleAuth() {
     register.style.display = isLoginVisible ? 'block' : 'none';
 }
 
-// 4. MANEJO DE LOGIN
+// 4. LOGIN ACTUALIZADO (Guarda el nombre del usuario)
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('email').value;
@@ -51,6 +51,8 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         if (response.ok) {
             localStorage.setItem('token', data.token);
             localStorage.setItem('userRol', data.user.rol);
+            // PASO CLAVE: Guardamos el nombre para el marcador
+            localStorage.setItem('userName', data.user.nombre); 
             configurarInterfazSegunRol(data.user.rol);
         } else {
             alert(data.msg || "Error en el login");
@@ -60,7 +62,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     }
 });
 
-// 5. MANEJO DE REGISTRO
+// 5. REGISTRO
 document.getElementById('register-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const nombre = document.getElementById('reg-nombre').value;
@@ -75,7 +77,7 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
             body: JSON.stringify({ nombre, email, password, rol })
         });
         if (res.ok) {
-            alert("✅ Registro exitoso. Iniciando sesión...");
+            alert("✅ Registro exitoso. Inicia sesión.");
             toggleAuth();
         } else {
             const data = await res.json();
@@ -86,7 +88,7 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
     }
 });
 
-// 6. CONFIGURACIÓN DE LA INTERFAZ Y VISTA DE DUEÑO
+// 6. INTERFAZ
 async function configurarInterfazSegunRol(rol) {
     document.getElementById('auth-section').style.display = 'none';
     document.getElementById('map-section').style.display = 'block';
@@ -95,28 +97,34 @@ async function configurarInterfazSegunRol(rol) {
     document.getElementById('admin-panel').style.display = rol === 'concesionario' ? 'block' : 'none';
     document.getElementById('driver-panel').style.display = rol === 'chofer' ? 'block' : 'none';
 
-    // Si es Dueño o Usuario, cargamos las unidades activas para que las vean en el mapa
     if (rol === 'concesionario' || rol === 'usuario') {
-        cargarUnidadesEnMapa();
+        // Actualizamos el mapa cada 5 segundos para ver movimiento
+        setInterval(cargarUnidadesEnMapa, 5000); 
     }
 }
 
-// Nueva función para mostrar todas las combis activas al Dueño y Usuario
+// 7. CARGAR UNIDADES (Muestra quién es el chofer)
 async function cargarUnidadesEnMapa() {
     try {
-        const res = await fetch(`${API_URL}/combis/activas`); // Ruta que deberás tener en tu backend
+        const res = await fetch(`${API_URL}/combis/activas`);
         if (res.ok) {
             const unidades = await res.json();
             unidades.forEach(u => {
+                const popupContent = `
+                    <b>Unidad: ${u.numEconomico}</b><br>
+                    <b>Chofer: ${u.nombreChofer || 'Anonimo'}</b><br>
+                    Ruta: ${u.ruta}
+                `;
                 if (!marcadoresFlota[u._id]) {
-                    marcadoresFlota[u._id] = L.marker([u.lat, u.lng], { icon: combiIcon }).addTo(map)
-                        .bindPopup(`<b>Unidad: ${u.numEconomico}</b><br>Ruta: ${u.ruta}`);
+                    marcadoresFlota[u._id] = L.marker([u.lat, u.lng], { icon: combiIcon })
+                        .addTo(map)
+                        .bindPopup(popupContent);
                 } else {
-                    marcadoresFlota[u._id].setLatLng([u.lat, u.lng]); // Actualiza posición si ya existe
+                    marcadoresFlota[u._id].setLatLng([u.lat, u.lng]).setPopupContent(popupContent);
                 }
             });
         }
-    } catch (e) { console.log("Cargando unidades..."); }
+    } catch (e) { console.log("Buscando unidades..."); }
 }
 
 function initMap() {
@@ -127,50 +135,54 @@ function initMap() {
     setTimeout(() => { map.invalidateSize(); }, 200);
 }
 
-// 7. REGISTRO DE UNIDAD E ITINERARIO (IDA Y VUELTA)
-document.getElementById('combi-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const economico = document.getElementById('numEconomico').value;
-    const entrada = document.getElementById('rutaCombi').value.toLowerCase().trim();
-    
-    let puntosFinales = null;
-    const claveIda = entrada.replace(/\s+/g, '-');
-    const claveVuelta = entrada.split(/\s+/).reverse().join('-');
-
-    if (rutasMaestras[claveIda]) {
-        puntosFinales = rutasMaestras[claveIda];
-    } else if (rutasMaestras[claveVuelta]) {
-        puntosFinales = [...rutasMaestras[claveVuelta]].reverse();
-    }
-
-    if (puntosFinales) {
-        if (rutaActual) map.removeLayer(rutaActual); 
-        
-        rutaActual = L.polyline(puntosFinales, { color: '#00796b', weight: 5, opacity: 0.7 }).addTo(map);
-        
-        const m = L.marker(puntosFinales[0], { icon: combiIcon }).addTo(map)
-            .bindPopup(`<b>Unidad: ${economico}</b><br>Ruta: ${entrada.toUpperCase()}`)
-            .openPopup();
-            
-        map.fitBounds(rutaActual.getBounds(), { padding: [50, 50] });
-    } else {
-        alert("Ruta no definida. Intenta 'Apizaco Teacalco' o 'Teacalco Apizaco'");
-    }
-});
-
-// 8. CERRAR SESIÓN
-function logout() {
-    localStorage.clear();
-    location.reload();
-}
-
-// 9. ESTADO CHOFER
+// 8. RASTREO GPS EN TIEMPO REAL (Para el Chofer)
 function toggleStatus() {
     const btn = document.getElementById('btn-status');
     const statusText = document.getElementById('status-text');
     const estaActivo = btn.innerText === "Iniciar Ruta";
     
-    btn.innerText = estaActivo ? "Finalizar Ruta" : "Iniciar Ruta";
-    statusText.innerText = estaActivo ? "Activo - En Ruta" : "Fuera de Servicio";
-    btn.style.background = estaActivo ? "#d32f2f" : "#00796b";
+    if (estaActivo) {
+        btn.innerText = "Finalizar Ruta";
+        statusText.innerText = "Activo - En Ruta";
+        btn.style.background = "#d32f2f";
+        iniciarSeguimientoGPS();
+    } else {
+        btn.innerText = "Iniciar Ruta";
+        statusText.innerText = "Fuera de Servicio";
+        btn.style.background = "#00796b";
+        detenerSeguimientoGPS();
+    }
+}
+
+function iniciarSeguimientoGPS() {
+    if ("geolocation" in navigator) {
+        watchId = navigator.geolocation.watchPosition(async (pos) => {
+            const coords = {
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+                nombreChofer: localStorage.getItem('userName'),
+                numEconomico: document.getElementById('numEconomico').value || "S/N",
+                ruta: document.getElementById('rutaCombi').value || "General"
+            };
+
+            // Enviar a Render
+            await fetch(`${API_URL}/combis/update-gps`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(coords)
+            });
+        }, (err) => console.error(err), { enableHighAccuracy: true });
+    }
+}
+
+function detenerSeguimientoGPS() {
+    if (watchId) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+    }
+}
+
+function logout() {
+    localStorage.clear();
+    location.reload();
 }

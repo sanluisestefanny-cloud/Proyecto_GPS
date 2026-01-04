@@ -49,6 +49,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
             localStorage.setItem('token', data.token);
             localStorage.setItem('userRol', data.user.rol);
             localStorage.setItem('userName', data.user.nombre); 
+            // Guardamos la unidad vinculada que viene del servidor
             if(data.user.unidad) localStorage.setItem('userUnidad', data.user.unidad);
             
             configurarInterfazSegunRol(data.user.rol);
@@ -60,14 +61,17 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     }
 });
 
-// 3. REGISTRO
+// 3. REGISTRO (Captura correctamente la unidad del chofer)
 document.getElementById('register-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const nombre = document.getElementById('reg-nombre').value;
     const email = document.getElementById('reg-email').value;
     const password = document.getElementById('reg-password').value;
     const rol = document.getElementById('reg-rol').value;
-    const unidad = document.getElementById('reg-unidad').value;
+    
+    // CAPTURA DE UNIDAD: Importante para el formulario del chofer
+    const unidadInput = document.getElementById('reg-unidad');
+    const unidad = unidadInput ? unidadInput.value : null;
 
     try {
         const res = await fetch(`${API_URL}/auth/register`, {
@@ -87,13 +91,16 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
     }
 });
 
+// Función para mostrar/ocultar el campo de unidad en el registro
 function verificarRol(){
     const rol = document.getElementById('reg-rol').value;
     const container = document.getElementById('unidad-input-container');
-    container.style.display =( rol === 'chofer') ? 'block' : 'none';
+    if(container) {
+        container.style.display = (rol === 'chofer') ? 'block' : 'none';
+    }
 }
 
-// 4. CONFIGURACIÓN DE INTERFAZ Y REFRESCADO
+// 4. CONFIGURACIÓN DE INTERFAZ
 async function configurarInterfazSegunRol(rol) {
     document.getElementById('auth-section').style.display = 'none';
     document.getElementById('map-section').style.display = 'block';
@@ -106,14 +113,11 @@ async function configurarInterfazSegunRol(rol) {
     document.getElementById('admin-panel').style.display = rol === 'concesionario' ? 'block' : 'none';
     document.getElementById('driver-panel').style.display = rol === 'chofer' ? 'block' : 'none';
 
-    // Carga inicial inmediata
     cargarUnidadesEnMapa();
-    
-    // Refresco constante cada 4 segundos para mayor fluidez
     setInterval(cargarUnidadesEnMapa, 4000); 
 }
 
-// 5. LÓGICA MAESTRA DE RENDERIZADO DE FLOTA
+// 5. RENDERIZADO DE FLOTA (Simuladas + Reales)
 async function cargarUnidadesEnMapa() {
     try {
         const res = await fetch(`${API_URL}/combis/activas`);
@@ -122,7 +126,6 @@ async function cargarUnidadesEnMapa() {
             unidadesReales = await res.json();
         }
 
-        // Combinamos las fijas (simuladas) con las que vienen de la base de datos
         const todasLasUnidades = [...unidadesSimuladas, ...unidadesReales];
 
         todasLasUnidades.forEach(u => {
@@ -134,14 +137,12 @@ async function cargarUnidadesEnMapa() {
                 </div>`;
 
             if (!marcadoresFlota[u._id]) {
-                // Crear marcador nuevo si no existe
                 marcadoresFlota[u._id] = L.marker([u.lat, u.lng], { icon: combiIcon })
                     .addTo(map).bindPopup(popupContent);
                 
-                // Si es real (ID de MongoDB), lo resaltamos abriendo el popup
+                // Si la unidad es real (ID de MongoDB), abre el popup automáticamente al aparecer
                 if(!u._id.toString().startsWith('sim')) marcadoresFlota[u._id].openPopup();
             } else {
-                // Actualizar posición y contenido
                 marcadoresFlota[u._id].setLatLng([u.lat, u.lng]).setPopupContent(popupContent);
             }
         });
@@ -155,37 +156,44 @@ function initMap() {
         map = L.map('map').setView([19.313, -98.238], 11);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     }
-    // Forzar el redibujado del mapa para evitar cuadros grises
     setTimeout(() => { map.invalidateSize(); }, 400);
 }
 
-// 6. CONTROL DEL CHOFER
+// 6. ACTIVACIÓN INMEDIATA DEL CHOFER
 function toggleStatus() {
     const btn = document.getElementById('btn-status');
     const estaActivo = btn.innerText === "Iniciar Ruta";
     
     if (estaActivo) {
+        // Validación de unidad para choferes
+        let unidad = localStorage.getItem('userUnidad');
+        if (!unidad) {
+            unidad = prompt("Unidad no detectada. Ingresa el número de tu unidad:");
+            if (unidad) localStorage.setItem('userUnidad', unidad);
+            else return; 
+        }
+
         btn.innerText = "Finalizar Ruta";
         btn.style.background = "#d32f2f";
         
-        // ENVÍO INMEDIATO AL PRESIONAR EL BOTÓN
+        // ENVÍO DE UBICACIÓN INMEDIATO AL ACTIVAR
         navigator.geolocation.getCurrentPosition(async (pos) => {
             const inicial = {
                 lat: pos.coords.latitude,
                 lng: pos.coords.longitude,
                 nombreChofer: localStorage.getItem('userName'),
-                numEconomico: localStorage.getItem('userUnidad') || "S/N",
-                ruta: "Iniciando Servicio"
+                numEconomico: unidad,
+                ruta: "Servicio Iniciado"
             };
+            
             await fetch(`${API_URL}/combis/update-gps`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(inicial)
             });
             
-            // Iniciar rastreo continuo
             iniciarSeguimientoGPS();
-        }, (err) => alert("Por favor activa el GPS de tu celular"), { enableHighAccuracy: true });
+        }, (err) => alert("Error: Debes permitir el acceso al GPS para iniciar ruta."), { enableHighAccuracy: true });
     } else {
         btn.innerText = "Iniciar Ruta";
         btn.style.background = "#00796b";

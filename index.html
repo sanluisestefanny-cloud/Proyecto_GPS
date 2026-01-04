@@ -31,27 +31,27 @@
                     <p>¿Eres nuevo? <a href="#" onclick="toggleAuth()">Regístrate</a></p>
                 </div>
 
-               <div id="register-container" style="display: none;">
-    <h2>Registro de Personal</h2>
-    <form id="register-form">
-        <input type="text" id="reg-nombre" placeholder="Nombre completo" required>
-        <input type="email" id="reg-email" placeholder="Email" required>
-        <input type="password" id="reg-password" placeholder="Contraseña" required>
-        
-        <select id="reg-rol" onchange="verificarRol()">
-            <option value="usuario">Pasajero (Usuario)</option>
-            <option value="chofer">Chofer (Operador)</option>
-            <option value="concesionario">Dueño (Concesionario)</option>
-        </select>
+                <div id="register-container" style="display: none;">
+                    <h2>Registro de Personal</h2>
+                    <form id="register-form">
+                        <input type="text" id="reg-nombre" placeholder="Nombre completo" required>
+                        <input type="email" id="reg-email" placeholder="Email" required>
+                        <input type="password" id="reg-password" placeholder="Contraseña" required>
+                        
+                        <select id="reg-rol" onchange="verificarRol()">
+                            <option value="usuario">Pasajero (Usuario)</option>
+                            <option value="chofer">Chofer (Operador)</option>
+                            <option value="concesionario">Dueño (Concesionario)</option>
+                        </select>
 
-        <div id="unidad-input-container" style="display: none; margin-top: 10px;">
-            <input type="text" id="reg-unidad" placeholder="Número de Unidad Asignada (Ej: 22)">
-        </div>
+                        <div id="unidad-input-container" style="display: none; margin-top: 10px;">
+                            <input type="text" id="reg-unidad" placeholder="Número de Unidad (Ej: 22)">
+                        </div>
 
-        <button type="submit">Crear Cuenta</button>
-    </form>
-    <p><a href="#" onclick="toggleAuth()">Volver al Login</a></p>
-</div>
+                        <button type="submit">Crear Cuenta</button>
+                    </form>
+                    <p><a href="#" onclick="toggleAuth()">Volver al Login</a></p>
+                </div>
             </div>
         </section>
 
@@ -63,7 +63,7 @@
                 <form id="combi-form">
                     <input type="text" id="placas" placeholder="Placas (Ej: XTA-123)" required>
                     <input type="text" id="numEconomico" placeholder="Número Económico" required>
-                    <input type="text" id="rutaCombi" list="opcionesRutas" placeholder="Seleccione Ruta e Itinerario" required>
+                    <input type="text" id="rutaCombi" list="opcionesRutas" placeholder="Seleccione Ruta" required>
                     <datalist id="opcionesRutas">
                         <option value="Apizaco Teacalco">
                         <option value="Teacalco Apizaco">
@@ -73,7 +73,6 @@
                         <option value="Tlaxcala Huamantla">
                         <option value="Apizaco Huamantla">
                         <option value="Huamantla Apizaco">
-                        </option>
                     </datalist>
                     <button type="submit">Activar en Mapa</button>
                 </form>

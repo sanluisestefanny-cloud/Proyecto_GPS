@@ -202,3 +202,32 @@ input[list]::-webkit-calendar-picker-indicator {
     height: 70vh; /* Reduce el mapa al 70% de la pantalla en móvil */
     width: 100%;
 }
+/* Esto mantendrá el botón siempre visible en la esquina superior */
+.logout-container {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 3000; /* Un número alto para que nada lo tape */
+}
+
+#btn-logout {
+    background-color: #d32f2f;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    font-weight: bold;
+    box-shadow: 0px 2px 5px rgba(0,0,0,0.5);
+}
+
+/* Ajuste para que el panel del chofer no tape todo el mapa en el celular */
+@media (max-width: 600px) {
+    #map {
+        height: 50vh; /* El mapa ocupará solo la mitad de la pantalla */
+    }
+    .floating-panel {
+        position: relative;
+        margin: 10px;
+        width: auto;
+    }
+}

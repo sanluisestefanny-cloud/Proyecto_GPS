@@ -53,7 +53,7 @@ app.post('/api/combis/update-gps', async (req, res) => {
 app.get('/api/combis/activas', async (req, res) => {
     try {
         // Margen de 30 minutos para mantener la visibilidad en el mapa
-        const margenTiempo = new Date(Date.now() - 30 * 60 * 1000); 
+        const margenTiempo = new Date(Date.now() - 120 * 60 * 1000); 
         const unidades = await Combi.find({ 
             ultimaActualizacion: { $gte: margenTiempo },
             activo: true 

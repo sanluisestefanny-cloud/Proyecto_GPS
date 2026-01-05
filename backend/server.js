@@ -3,9 +3,9 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
 
-// --- 1. IMPORTACIÓN DEL MODELO (Paso 2 de limpieza) ---
-// Importamos el modelo desde su archivo independiente para evitar duplicados
-const Combi = require('./models/Combi');
+// --- 1. IMPORTACIÓN DEL MODELO ---
+// Importamos solo desde el archivo externo para evitar el OverwriteModelError
+const Combi = require('./models/Combi'); 
 
 const app = express();
 
@@ -18,7 +18,7 @@ app.use('/api/auth', require('./routes/auth'));
 
 // --- 4. RUTAS DE RASTREO GPS ---
 
-// ACTUALIZAR POSICIÓN: Recibe datos del celular y los guarda en Atlas
+// ACTUALIZAR POSICIÓN: Recibe datos del celular
 app.post('/api/combis/update-gps', async (req, res) => {
     try {
         const { numEconomico, lat, lng, nombreChofer, ruta } = req.body;
@@ -27,7 +27,7 @@ app.post('/api/combis/update-gps', async (req, res) => {
             return res.status(400).json({ msg: "Datos incompletos (Falta unidad o coordenadas)" });
         }
 
-        // Usamos el modelo importado para actualizar o crear (upsert)
+        // Buscamos por numEconomico. Si no existe lo crea (upsert).
         const unidadActualizada = await Combi.findOneAndUpdate(
             { numEconomico: numEconomico }, 
             { 
@@ -49,10 +49,10 @@ app.post('/api/combis/update-gps', async (req, res) => {
     }
 });
 
-// OBTENER UNIDADES: El mapa consulta esta ruta para dibujar los marcadores
+// OBTENER UNIDADES: El mapa consulta esta ruta
 app.get('/api/combis/activas', async (req, res) => {
     try {
-        // Margen de 30 minutos para mantener la visibilidad en el mapa
+        // Mantenemos 120 minutos (2 horas) para que no desaparezcan rápido
         const margenTiempo = new Date(Date.now() - 120 * 60 * 1000); 
         const unidades = await Combi.find({ 
             ultimaActualizacion: { $gte: margenTiempo },
@@ -64,14 +64,15 @@ app.get('/api/combis/activas', async (req, res) => {
     }
 });
 
+// --- 5. OTRAS RUTAS ---
 app.use('/api/combis', require('./routes/combis')); 
 
-// --- 5. CONEXIÓN A MONGODB ATLAS ---
+// --- 6. CONEXIÓN A MONGODB ATLAS ---
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('🚀 Conectado a MongoDB Atlas: GPS_Proyecto'))
     .catch(err => console.error('❌ Error de conexión:', err));
 
-// --- 6. RUTA DE PRUEBA ---
+// --- 7. RUTA DE PRUEBA ---
 app.get('/', (req, res) => {
     res.send('Servidor GPS Activo y Sincronizado 🚀');
 });
